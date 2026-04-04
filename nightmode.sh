@@ -27,9 +27,12 @@ case "${1:-}" in
       done
     fi
 
-    # Ensure model is available
+    # Ensure model is available and warm it up
     echo "Ensuring $MODEL is available..."
     "$OLLAMA" pull "$MODEL"
+    echo "Warming up model..."
+    curl -s http://localhost:11434/api/generate -d "{\"model\":\"$MODEL\",\"prompt\":\"hello\",\"stream\":false,\"options\":{\"num_predict\":1}}" > /dev/null 2>&1
+    echo "Model ready."
 
     # Start watchdog in background
     "$PYTHON" "$NIGHTMODE_DIR/watchdog.py" &
