@@ -1,0 +1,3 @@
+# Hard-blocked commands (one regex per line)
+# These are DENIED, not just logged
+^git\s+push(\s|$)
