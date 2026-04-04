@@ -10,9 +10,6 @@ MODEL="qwen2.5-coder:3b"
 
 case "${1:-}" in
   on)
-    # Create flag file
-    touch "$FLAG_FILE"
-
     # Start Ollama if not responding
     if ! curl -s --max-time 2 http://localhost:11434/api/tags > /dev/null 2>&1; then
       echo "Starting Ollama..."
@@ -27,12 +24,15 @@ case "${1:-}" in
       done
     fi
 
-    # Ensure model is available and warm it up
+    # Ensure model is available and warm it up (~60s cold load)
     echo "Ensuring $MODEL is available..."
     "$OLLAMA" pull "$MODEL"
-    echo "Warming up model..."
+    echo "Warming up model (first load takes ~60s)..."
     curl -s http://localhost:11434/api/generate -d "{\"model\":\"$MODEL\",\"prompt\":\"hello\",\"stream\":false,\"options\":{\"num_predict\":1}}" > /dev/null 2>&1
-    echo "Model ready."
+    echo "Model warm."
+
+    # NOW activate — hook is a no-op until this file exists
+    touch "$FLAG_FILE"
 
     # Start watchdog in background
     "$PYTHON" "$NIGHTMODE_DIR/watchdog.py" &
