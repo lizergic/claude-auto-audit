@@ -1,5 +1,7 @@
 import json
 import os
+import io
+import glob
 import pytest
 
 import hook
@@ -137,3 +139,130 @@ class TestClassifyCommand:
         _, _, latency = hook.classify_command("echo hi", self.make_config())
         assert isinstance(latency, int)
         assert latency >= 0
+
+
+class TestLogEntry:
+    def test_creates_jsonl_file(self, patched_hook, nightmode_env):
+        entry = {"timestamp": "2026-04-01T01:00:00+00:00", "command": "rm -rf /tmp"}
+        patched_hook.log_entry(entry)
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        assert len(files) == 1
+        with open(files[0]) as f:
+            logged = json.loads(f.readline())
+        assert logged["command"] == "rm -rf /tmp"
+
+    def test_appends_multiple_entries(self, patched_hook, nightmode_env):
+        patched_hook.log_entry({"command": "first"})
+        patched_hook.log_entry({"command": "second"})
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        with open(files[0]) as f:
+            lines = f.readlines()
+        assert len(lines) == 2
+
+
+class TestMain:
+    def test_nightmode_off_no_output(self, patched_hook, capsys):
+        patched_hook.main()
+        assert capsys.readouterr().out == ""
+
+    def test_blocked_command_denied(self, patched_hook, nightmode_env, monkeypatch, capsys):
+        open(nightmode_env["flag_file"], "w").close()
+        input_json = json.dumps({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git push origin main"},
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(input_json))
+        patched_hook.main()
+
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "blocked" in output["hookSpecificOutput"]["permissionDecisionReason"].lower()
+
+    def test_blocked_command_logged(self, patched_hook, nightmode_env, monkeypatch, capsys):
+        open(nightmode_env["flag_file"], "w").close()
+        input_json = json.dumps({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git push origin main"},
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(input_json))
+        patched_hook.main()
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        assert len(files) == 1
+        with open(files[0]) as f:
+            entry = json.loads(f.readline())
+        assert entry["action"] == "blocked"
+
+    @patch("hook.classify_command")
+    def test_dangerous_command_allowed_and_logged(
+        self, mock_classify, patched_hook, nightmode_env, monkeypatch, capsys
+    ):
+        open(nightmode_env["flag_file"], "w").close()
+        mock_classify.return_value = ("DANGEROUS", "Deletes files recursively", 500)
+        input_json = json.dumps({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": {"command": "rm -rf node_modules/"},
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(input_json))
+        patched_hook.main()
+
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        with open(files[0]) as f:
+            entry = json.loads(f.readline())
+        assert entry["classification"] == "DANGEROUS"
+        assert entry["action"] == "logged_and_approved"
+
+    @patch("hook.classify_command")
+    def test_safe_command_allowed_not_logged(
+        self, mock_classify, patched_hook, nightmode_env, monkeypatch, capsys
+    ):
+        open(nightmode_env["flag_file"], "w").close()
+        mock_classify.return_value = ("SAFE", "Lists files", 200)
+        input_json = json.dumps({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls -la"},
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(input_json))
+        patched_hook.main()
+
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        assert len(files) == 0
+
+    @patch("hook.classify_command")
+    def test_unknown_command_allowed_and_logged(
+        self, mock_classify, patched_hook, nightmode_env, monkeypatch, capsys
+    ):
+        open(nightmode_env["flag_file"], "w").close()
+        mock_classify.return_value = ("UNKNOWN", "ollama_timeout", 3000)
+        input_json = json.dumps({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": {"command": "some-cmd"},
+        })
+        monkeypatch.setattr("sys.stdin", io.StringIO(input_json))
+        patched_hook.main()
+
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+        files = glob.glob(os.path.join(nightmode_env["log_dir"], "*.jsonl"))
+        with open(files[0]) as f:
+            entry = json.loads(f.readline())
+        assert entry["action"] == "ollama_timeout_approved"

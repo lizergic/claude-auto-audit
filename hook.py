@@ -83,3 +83,72 @@ def classify_command(command, config):
     except Exception:
         latency_ms = int((time.time() - start) * 1000)
         return "UNKNOWN", "ollama_timeout", latency_ms
+
+
+def log_entry(entry):
+    os.makedirs(LOG_DIR, exist_ok=True)
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    path = os.path.join(LOG_DIR, f"{date_str}.jsonl")
+    with open(path, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def main():
+    if not is_nightmode_active():
+        return
+
+    hook_input = json.loads(sys.stdin.read())
+    command = hook_input.get("tool_input", {}).get("command", "")
+    session_id = hook_input.get("session_id", "")
+    cwd = hook_input.get("cwd", "")
+
+    if not command:
+        return
+
+    patterns = load_blocked_patterns()
+    blocked, matched = check_blocked(command, patterns)
+    if blocked:
+        reason = f"Blocked by nightmode policy (pattern: {matched})"
+        log_entry({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "cwd": cwd,
+            "command": command,
+            "classification": "BLOCKED",
+            "reason": reason,
+            "action": "blocked",
+        })
+        print(json.dumps(make_deny(reason)))
+        return
+
+    config = load_config()
+    classification, reason, latency_ms = classify_command(command, config)
+
+    if classification == "DANGEROUS":
+        log_entry({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "cwd": cwd,
+            "command": command,
+            "classification": "DANGEROUS",
+            "reason": reason,
+            "action": "logged_and_approved",
+            "model_latency_ms": latency_ms,
+        })
+    elif classification == "UNKNOWN":
+        log_entry({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "cwd": cwd,
+            "command": command,
+            "classification": "UNKNOWN",
+            "reason": reason,
+            "action": "ollama_timeout_approved",
+            "model_latency_ms": latency_ms,
+        })
+
+    print(json.dumps(make_allow()))
+
+
+if __name__ == "__main__":
+    main()
