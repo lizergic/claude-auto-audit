@@ -75,3 +75,65 @@ class TestCheckBlocked:
     def test_allows_grep_git_push(self):
         blocked, _ = hook.check_blocked("grep 'git push' README.md", ["^git\\s+push(\\s|$)"])
         assert blocked is False
+
+
+from unittest.mock import patch, MagicMock
+
+
+class TestClassifyCommand:
+    def make_config(self):
+        return {
+            "ollama_url": "http://localhost:11434",
+            "model": "qwen2.5-coder:3b",
+            "classification_timeout_ms": 3000,
+        }
+
+    @patch("hook.requests")
+    def test_dangerous_classification(self, mock_requests):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "response": "DANGEROUS Recursively deletes directory contents"
+        }
+        mock_requests.post.return_value = mock_resp
+
+        cls, reason, latency = hook.classify_command("rm -rf /", self.make_config())
+        assert cls == "DANGEROUS"
+        assert "DANGEROUS" in reason
+
+    @patch("hook.requests")
+    def test_safe_classification(self, mock_requests):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"response": "SAFE Lists files in directory"}
+        mock_requests.post.return_value = mock_resp
+
+        cls, reason, latency = hook.classify_command("ls -la", self.make_config())
+        assert cls == "SAFE"
+
+    @patch("hook.requests")
+    def test_timeout_returns_unknown(self, mock_requests):
+        import requests as real_requests
+        mock_requests.post.side_effect = real_requests.exceptions.Timeout("timed out")
+        mock_requests.exceptions = real_requests.exceptions
+
+        cls, reason, latency = hook.classify_command("some cmd", self.make_config())
+        assert cls == "UNKNOWN"
+        assert reason == "ollama_timeout"
+
+    @patch("hook.requests")
+    def test_connection_error_returns_unknown(self, mock_requests):
+        import requests as real_requests
+        mock_requests.post.side_effect = real_requests.exceptions.ConnectionError()
+        mock_requests.exceptions = real_requests.exceptions
+
+        cls, reason, latency = hook.classify_command("some cmd", self.make_config())
+        assert cls == "UNKNOWN"
+
+    @patch("hook.requests")
+    def test_latency_is_measured(self, mock_requests):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"response": "SAFE trivial command"}
+        mock_requests.post.return_value = mock_resp
+
+        _, _, latency = hook.classify_command("echo hi", self.make_config())
+        assert isinstance(latency, int)
+        assert latency >= 0
