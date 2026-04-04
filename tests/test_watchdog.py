@@ -123,3 +123,120 @@ class TestLogEvent:
         with open(files[0]) as f:
             entry = json.loads(f.readline())
         assert entry["event"] == "test"
+
+
+class TestAutoCommit:
+    @patch("watchdog.subprocess")
+    def test_successful_commit(self, mock_subprocess):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "[main abc1234] nightmode: auto-save at 87% memory"
+        mock_subprocess.run.return_value = mock_result
+
+        success, sha = watchdog.auto_commit("/tmp/project", 87)
+        assert success is True
+        assert "abc1234" in sha
+
+    @patch("watchdog.subprocess")
+    def test_failed_commit(self, mock_subprocess):
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = "nothing to commit"
+        mock_subprocess.run.return_value = mock_result
+
+        success, sha = watchdog.auto_commit("/tmp/project", 87)
+        assert success is False
+
+
+class TestKillProcessTree:
+    @patch("watchdog.psutil")
+    def test_kills_process_and_children(self, mock_psutil):
+        child1 = MagicMock()
+        child2 = MagicMock()
+        proc = MagicMock()
+        proc.children.return_value = [child1, child2]
+        mock_psutil.Process.return_value = proc
+
+        result = watchdog.kill_process_tree(1234)
+        assert result is True
+        child1.terminate.assert_called_once()
+        child2.terminate.assert_called_once()
+        proc.terminate.assert_called_once()
+
+    @patch("watchdog.psutil")
+    def test_handles_already_dead_process(self, mock_psutil):
+        mock_psutil.Process.side_effect = psutil.NoSuchProcess(1234)
+        mock_psutil.NoSuchProcess = psutil.NoSuchProcess
+
+        result = watchdog.kill_process_tree(1234)
+        assert result is False
+
+
+class TestShutdownSequence:
+    @patch("watchdog.time")
+    @patch("watchdog.log_event")
+    @patch("watchdog.get_process_cwd", return_value="/tmp/project")
+    @patch("watchdog.kill_process_tree", return_value=True)
+    @patch("watchdog.auto_commit", return_value=(True, "abc1234"))
+    @patch("watchdog.find_claude_processes")
+    @patch("watchdog.get_ram_percent")
+    def test_kills_biggest_instance_first(
+        self, mock_ram, mock_find, mock_commit, mock_kill, mock_cwd, mock_log, mock_time
+    ):
+        mock_ram.side_effect = [87, 71]  # before kill, after kill (71 < 75 = safe)
+        mock_find.return_value = [
+            {"pid": 300, "memory_bytes": 800_000_000, "cmdline": "node claude"},
+            {"pid": 100, "memory_bytes": 500_000_000, "cmdline": "node claude"},
+        ]
+
+        config = {"ram_kill_threshold": 85, "ram_safe_threshold": 75, "min_surviving_instances": 1}
+        killed = watchdog.shutdown_sequence(config)
+
+        assert len(killed) == 1
+        assert killed[0]["pid"] == 300
+
+    @patch("watchdog.time")
+    @patch("watchdog.log_event")
+    @patch("watchdog.get_process_cwd", return_value="/tmp/project")
+    @patch("watchdog.kill_process_tree")
+    @patch("watchdog.auto_commit")
+    @patch("watchdog.find_claude_processes")
+    @patch("watchdog.get_ram_percent", return_value=90)
+    def test_never_kills_last_instance(
+        self, mock_ram, mock_find, mock_commit, mock_kill, mock_cwd, mock_log, mock_time
+    ):
+        mock_find.return_value = [
+            {"pid": 100, "memory_bytes": 500_000_000, "cmdline": "node claude"},
+        ]
+
+        config = {"ram_kill_threshold": 85, "ram_safe_threshold": 75, "min_surviving_instances": 1}
+        killed = watchdog.shutdown_sequence(config)
+
+        assert len(killed) == 0
+        mock_kill.assert_not_called()
+
+    @patch("watchdog.time")
+    @patch("watchdog.log_event")
+    @patch("watchdog.get_process_cwd", return_value="/tmp/project")
+    @patch("watchdog.kill_process_tree", return_value=True)
+    @patch("watchdog.auto_commit", return_value=(True, "abc1234"))
+    @patch("watchdog.find_claude_processes")
+    @patch("watchdog.get_ram_percent")
+    def test_stops_when_ram_drops_below_safe(
+        self, mock_ram, mock_find, mock_commit, mock_kill, mock_cwd, mock_log, mock_time
+    ):
+        # Iteration 1: ram_pct=90, kill PID 300, sleep, ram_after=82 (>75, continue)
+        # Iteration 2: ram_pct=70, kill PID 200, sleep, ram_after=60 (<75, stop)
+        mock_ram.side_effect = [90, 82, 70, 60]
+        mock_find.return_value = [
+            {"pid": 300, "memory_bytes": 800_000_000, "cmdline": "node claude"},
+            {"pid": 200, "memory_bytes": 600_000_000, "cmdline": "node claude"},
+            {"pid": 100, "memory_bytes": 500_000_000, "cmdline": "node claude"},
+        ]
+
+        config = {"ram_kill_threshold": 85, "ram_safe_threshold": 75, "min_surviving_instances": 1}
+        killed = watchdog.shutdown_sequence(config)
+
+        assert len(killed) == 2
+        assert killed[0]["pid"] == 300
+        assert killed[1]["pid"] == 200
