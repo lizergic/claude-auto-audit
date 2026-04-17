@@ -1,0 +1,10 @@
+{
+  "ollama_url": "http://localhost:11434",
+  "model": "qwen2.5-coder:3b",
+  "classification_timeout_ms": 5000,
+  "watchdog_poll_interval_s": 30,
+  "ram_warning_threshold": 80,
+  "ram_kill_threshold": 85,
+  "ram_safe_threshold": 75,
+  "min_surviving_instances": 1
+}
