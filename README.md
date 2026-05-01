@@ -164,3 +164,7 @@ cd claude-auto-audit
 - Qwen 3B takes ~60s to cold-load into VRAM (tested on GTX 1660 Ti, 6 GB). `caudit on` handles this automatically.
 - Once warm, classification takes ~1.5-3.5s per command.
 - The model uses ~2 GB VRAM. Ollama unloads it after inactivity, so daytime VRAM is free for other things.
+
+## Customizing & Contributing
+
+This is intentionally small — the allowlist, blocked patterns, watchdog thresholds, and classification prompt are designed to be edited. Fork it and tune to your workflow. If you want a feature or hit a bug, [open an issue](https://github.com/lizergic/claude-auto-audit/issues) or send a PR.
