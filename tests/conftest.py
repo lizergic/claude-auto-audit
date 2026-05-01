@@ -8,9 +8,9 @@ import pytest
 
 
 @pytest.fixture
-def nightmode_env(tmp_path):
-    """Temporary nightmode directory structure for tests."""
-    config_dir = tmp_path / "nightmode"
+def audit_env(tmp_path):
+    """Temporary auto-audit directory structure for tests."""
+    config_dir = tmp_path / "claude-auto-audit"
     config_dir.mkdir()
     log_dir = tmp_path / "safety-logs"
     log_dir.mkdir()
@@ -30,7 +30,7 @@ def nightmode_env(tmp_path):
     (config_dir / "config.json").write_text(json.dumps(config))
     (config_dir / "blocked-patterns.txt").write_text("^git\\s+push(\\s|$)\n")
 
-    flag_file = tmp_path / "nightmode.active"
+    flag_file = tmp_path / "auto-audit.active"
 
     return {
         "tmp_path": tmp_path,

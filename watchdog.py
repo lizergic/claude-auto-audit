@@ -7,12 +7,12 @@ from datetime import datetime, timezone
 
 import psutil
 
-NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
-FLAG_FILE = os.path.join(BASE_DIR, "nightmode.active")
+AUDIT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(AUDIT_DIR)
+FLAG_FILE = os.path.join(BASE_DIR, "auto-audit.active")
 LOCK_FILE = os.path.join(BASE_DIR, "watchdog.lock")
 LOG_DIR = os.path.join(BASE_DIR, "watchdog-logs")
-CONFIG_PATH = os.path.join(NIGHTMODE_DIR, "config.json")
+CONFIG_PATH = os.path.join(AUDIT_DIR, "config.json")
 
 
 def load_config():
@@ -91,7 +91,7 @@ def auto_commit(cwd, ram_percent):
         if result.returncode != 0:
             return False, ""
         result = subprocess.run(
-            ["git", "commit", "-m", f"nightmode: auto-save at {ram_percent}% memory"],
+            ["git", "commit", "-m", f"auto-audit: auto-save at {ram_percent}% memory"],
             cwd=cwd,
             capture_output=True,
             text=True,

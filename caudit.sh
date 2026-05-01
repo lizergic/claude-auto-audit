@@ -1,22 +1,30 @@
 #!/bin/bash
 set -e
 
-NIGHTMODE_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_DIR="$(dirname "$NIGHTMODE_DIR")"
-FLAG_FILE="$BASE_DIR/nightmode.active"
+AUDIT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="$(dirname "$AUDIT_DIR")"
+FLAG_FILE="$BASE_DIR/auto-audit.active"
 LOCK_FILE="$BASE_DIR/watchdog.lock"
 
 # Auto-detect venv python (Windows vs Unix layout), fall back to system python3
-if [ -f "$NIGHTMODE_DIR/.venv/Scripts/python.exe" ]; then
-  PYTHON="$NIGHTMODE_DIR/.venv/Scripts/python.exe"
-elif [ -f "$NIGHTMODE_DIR/.venv/bin/python" ]; then
-  PYTHON="$NIGHTMODE_DIR/.venv/bin/python"
+if [ -f "$AUDIT_DIR/.venv/Scripts/python.exe" ]; then
+  PYTHON="$AUDIT_DIR/.venv/Scripts/python.exe"
+elif [ -f "$AUDIT_DIR/.venv/bin/python" ]; then
+  PYTHON="$AUDIT_DIR/.venv/bin/python"
 else
   PYTHON="python3"
 fi
 
 OLLAMA="${OLLAMA_BIN:-ollama}"
-MODEL="$($PYTHON -c "import json; print(json.load(open('$NIGHTMODE_DIR/config.json'))['model'])")"
+MODEL="$($PYTHON -c "import json; print(json.load(open('$AUDIT_DIR/config.json'))['model'])")"
+WATCHDOG_ENABLED="$($PYTHON -c "import json; print(str(json.load(open('$AUDIT_DIR/config.json')).get('watchdog_enabled', True)).lower())")"
+
+# CLI flag overrides config: caudit on --no-watchdog
+for arg in "$@"; do
+  if [ "$arg" = "--no-watchdog" ]; then
+    WATCHDOG_ENABLED="false"
+  fi
+done
 
 case "${1:-}" in
   on)
@@ -44,13 +52,16 @@ case "${1:-}" in
     # NOW activate — hook is a no-op until this file exists
     touch "$FLAG_FILE"
 
-    # Start watchdog in background
-    "$PYTHON" "$NIGHTMODE_DIR/watchdog.py" &
-    disown
-    echo "Watchdog started (PID: $!)"
+    if [ "$WATCHDOG_ENABLED" = "true" ]; then
+      "$PYTHON" "$AUDIT_DIR/watchdog.py" &
+      disown
+      echo "Watchdog started (PID: $!)"
+    else
+      echo "Watchdog disabled (config.watchdog_enabled=false or --no-watchdog)."
+    fi
 
     echo ""
-    echo "Night mode active. Safe to sleep."
+    echo "Auto-audit active. Safe to leave Claude running."
     ;;
 
   off)
@@ -67,32 +78,34 @@ case "${1:-}" in
       rm -f "$LOCK_FILE"
     fi
 
-    echo "Night mode off. Welcome back."
+    echo "Auto-audit off. Welcome back."
     echo ""
 
     # Show morning report
-    "$PYTHON" "$NIGHTMODE_DIR/morning_report.py"
+    "$PYTHON" "$AUDIT_DIR/morning_report.py"
     ;;
 
   status)
     if [ -f "$FLAG_FILE" ]; then
-      echo "Night mode: ACTIVE"
+      echo "Auto-audit: ACTIVE"
       if [ -f "$LOCK_FILE" ]; then
         echo "Watchdog: running (PID: $(cat "$LOCK_FILE"))"
-      else
+      elif [ "$WATCHDOG_ENABLED" = "true" ]; then
         echo "Watchdog: not running"
+      else
+        echo "Watchdog: disabled"
       fi
     else
-      echo "Night mode: OFF"
+      echo "Auto-audit: OFF"
     fi
     ;;
 
   report)
-    "$PYTHON" "$NIGHTMODE_DIR/morning_report.py" "${2:-}"
+    "$PYTHON" "$AUDIT_DIR/morning_report.py" "${2:-}"
     ;;
 
   *)
-    echo "Usage: nightmode {on|off|status|report [YYYY-MM-DD]}"
+    echo "Usage: caudit {on [--no-watchdog]|off|status|report [YYYY-MM-DD]}"
     exit 1
     ;;
 esac
