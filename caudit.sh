@@ -6,18 +6,26 @@ BASE_DIR="$(dirname "$AUDIT_DIR")"
 FLAG_FILE="$BASE_DIR/auto-audit.active"
 LOCK_FILE="$BASE_DIR/watchdog.lock"
 
-# Auto-detect venv python (Windows vs Unix layout), fall back to system python3
+# Auto-detect venv python (Windows vs Unix layout), fall back to system python
 if [ -f "$AUDIT_DIR/.venv/Scripts/python.exe" ]; then
   PYTHON="$AUDIT_DIR/.venv/Scripts/python.exe"
 elif [ -f "$AUDIT_DIR/.venv/bin/python" ]; then
   PYTHON="$AUDIT_DIR/.venv/bin/python"
-else
+elif command -v python3 > /dev/null 2>&1; then
   PYTHON="python3"
+elif command -v python > /dev/null 2>&1; then
+  PYTHON="python"
+elif command -v py > /dev/null 2>&1; then
+  PYTHON="py"
+else
+  echo "Error: no python interpreter found (tried .venv, python3, python, py)" >&2
+  exit 1
 fi
 
 OLLAMA="${OLLAMA_BIN:-ollama}"
-MODEL="$($PYTHON -c "import json; print(json.load(open('$AUDIT_DIR/config.json'))['model'])")"
-WATCHDOG_ENABLED="$($PYTHON -c "import json; print(str(json.load(open('$AUDIT_DIR/config.json')).get('watchdog_enabled', True)).lower())")"
+# Read config via stdin so we don't have to pass MinGW paths through Windows Python
+MODEL="$(cd "$AUDIT_DIR" && "$PYTHON" -c "import json; print(json.load(open('config.json'))['model'])")"
+WATCHDOG_ENABLED="$(cd "$AUDIT_DIR" && "$PYTHON" -c "import json; print(str(json.load(open('config.json')).get('watchdog_enabled', True)).lower())")"
 
 # CLI flag overrides config: caudit on --no-watchdog
 for arg in "$@"; do
