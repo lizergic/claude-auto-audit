@@ -6,15 +6,15 @@ import morning_report
 
 
 @pytest.fixture
-def patched_report(nightmode_env, monkeypatch):
-    monkeypatch.setattr(morning_report, "SAFETY_LOG_DIR", nightmode_env["log_dir"])
-    monkeypatch.setattr(morning_report, "WATCHDOG_LOG_DIR", nightmode_env["watchdog_log_dir"])
+def patched_report(audit_env, monkeypatch):
+    monkeypatch.setattr(morning_report, "SAFETY_LOG_DIR", audit_env["log_dir"])
+    monkeypatch.setattr(morning_report, "WATCHDOG_LOG_DIR", audit_env["watchdog_log_dir"])
     return morning_report
 
 
 @pytest.fixture
-def sample_safety_logs(nightmode_env):
-    path = os.path.join(nightmode_env["log_dir"], "2026-04-02.jsonl")
+def sample_safety_logs(audit_env):
+    path = os.path.join(audit_env["log_dir"], "2026-04-02.jsonl")
     entries = [
         {
             "timestamp": "2026-04-02T05:14:32+00:00",
@@ -32,7 +32,7 @@ def sample_safety_logs(nightmode_env):
             "cwd": "/tmp/project",
             "command": "git push origin feature/auth",
             "classification": "BLOCKED",
-            "reason": "Blocked by nightmode policy",
+            "reason": "Blocked by auto-audit policy",
             "action": "blocked",
         },
     ]
@@ -43,8 +43,8 @@ def sample_safety_logs(nightmode_env):
 
 
 @pytest.fixture
-def sample_watchdog_logs(nightmode_env):
-    path = os.path.join(nightmode_env["watchdog_log_dir"], "2026-04-02.jsonl")
+def sample_watchdog_logs(audit_env):
+    path = os.path.join(audit_env["watchdog_log_dir"], "2026-04-02.jsonl")
     entries = [
         {
             "timestamp": "2026-04-02T10:12:05+00:00",

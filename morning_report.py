@@ -4,8 +4,8 @@ import sys
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
+AUDIT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(AUDIT_DIR)
 SAFETY_LOG_DIR = os.path.join(BASE_DIR, "safety-logs")
 WATCHDOG_LOG_DIR = os.path.join(BASE_DIR, "watchdog-logs")
 
@@ -94,7 +94,7 @@ def format_report(safety_logs, watchdog_logs, branch_statuses):
         time_range = "no activity"
 
     lines = []
-    lines.append(f"=== NIGHT MODE REPORT ({time_range}) ===")
+    lines.append(f"=== AUTO-AUDIT REPORT ({time_range}) ===")
     lines.append("")
     lines.append(
         f"Commands classified: {len(safety_logs)} | "

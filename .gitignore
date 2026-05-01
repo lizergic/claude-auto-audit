@@ -10,7 +10,7 @@ __pycache__/
 myclaude_DSP.ps1
 
 # Runtime state (if someone clones into their live config dir)
-nightmode.active
+auto-audit.active
 watchdog.lock
 ../safety-logs/
 ../watchdog-logs/

@@ -9,11 +9,11 @@ import watchdog
 
 
 @pytest.fixture
-def patched_watchdog(nightmode_env, monkeypatch):
-    monkeypatch.setattr(watchdog, "FLAG_FILE", nightmode_env["flag_file"])
-    monkeypatch.setattr(watchdog, "LOCK_FILE", str(nightmode_env["tmp_path"] / "watchdog.lock"))
-    monkeypatch.setattr(watchdog, "LOG_DIR", nightmode_env["watchdog_log_dir"])
-    monkeypatch.setattr(watchdog, "CONFIG_PATH", os.path.join(nightmode_env["config_dir"], "config.json"))
+def patched_watchdog(audit_env, monkeypatch):
+    monkeypatch.setattr(watchdog, "FLAG_FILE", audit_env["flag_file"])
+    monkeypatch.setattr(watchdog, "LOCK_FILE", str(audit_env["tmp_path"] / "watchdog.lock"))
+    monkeypatch.setattr(watchdog, "LOG_DIR", audit_env["watchdog_log_dir"])
+    monkeypatch.setattr(watchdog, "CONFIG_PATH", os.path.join(audit_env["config_dir"], "config.json"))
     return watchdog
 
 
@@ -85,18 +85,18 @@ class TestGetProcessCwd:
 
 
 class TestLock:
-    def test_acquire_and_release(self, patched_watchdog, nightmode_env):
+    def test_acquire_and_release(self, patched_watchdog, audit_env):
         assert patched_watchdog.acquire_lock() is True
-        lock_path = str(nightmode_env["tmp_path"] / "watchdog.lock")
+        lock_path = str(audit_env["tmp_path"] / "watchdog.lock")
         assert os.path.exists(lock_path)
         patched_watchdog.release_lock()
         assert not os.path.exists(lock_path)
 
     @patch("watchdog.psutil")
     def test_acquire_fails_when_locked_by_running_process(
-        self, mock_psutil, patched_watchdog, nightmode_env
+        self, mock_psutil, patched_watchdog, audit_env
     ):
-        lock_path = str(nightmode_env["tmp_path"] / "watchdog.lock")
+        lock_path = str(audit_env["tmp_path"] / "watchdog.lock")
         with open(lock_path, "w") as f:
             f.write(str(os.getpid()))
         mock_psutil.pid_exists.return_value = True
@@ -105,9 +105,9 @@ class TestLock:
 
     @patch("watchdog.psutil")
     def test_acquire_succeeds_on_stale_lock(
-        self, mock_psutil, patched_watchdog, nightmode_env
+        self, mock_psutil, patched_watchdog, audit_env
     ):
-        lock_path = str(nightmode_env["tmp_path"] / "watchdog.lock")
+        lock_path = str(audit_env["tmp_path"] / "watchdog.lock")
         with open(lock_path, "w") as f:
             f.write("99999")
         mock_psutil.pid_exists.return_value = False
@@ -116,9 +116,9 @@ class TestLock:
 
 
 class TestLogEvent:
-    def test_writes_jsonl(self, patched_watchdog, nightmode_env):
+    def test_writes_jsonl(self, patched_watchdog, audit_env):
         patched_watchdog.log_event({"event": "test", "ram_percent": 85})
-        files = glob.glob(os.path.join(nightmode_env["watchdog_log_dir"], "*.jsonl"))
+        files = glob.glob(os.path.join(audit_env["watchdog_log_dir"], "*.jsonl"))
         assert len(files) == 1
         with open(files[0]) as f:
             entry = json.loads(f.readline())
@@ -130,7 +130,7 @@ class TestAutoCommit:
     def test_successful_commit(self, mock_subprocess):
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "[main abc1234] nightmode: auto-save at 87% memory"
+        mock_result.stdout = "[main abc1234] auto-audit: auto-save at 87% memory"
         mock_subprocess.run.return_value = mock_result
 
         success, sha = watchdog.auto_commit("/tmp/project", 87)

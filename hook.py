@@ -6,23 +6,23 @@ import time
 from datetime import datetime, timezone
 import requests
 
-NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
-FLAG_FILE = os.path.join(BASE_DIR, "nightmode.active")
+AUDIT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(AUDIT_DIR)
+FLAG_FILE = os.path.join(BASE_DIR, "auto-audit.active")
 LOG_DIR = os.path.join(BASE_DIR, "safety-logs")
 
 
-def is_nightmode_active():
+def is_audit_active():
     return os.path.exists(FLAG_FILE)
 
 
 def load_config():
-    with open(os.path.join(NIGHTMODE_DIR, "config.json")) as f:
+    with open(os.path.join(AUDIT_DIR, "config.json")) as f:
         return json.load(f)
 
 
 def load_blocked_patterns():
-    path = os.path.join(NIGHTMODE_DIR, "blocked-patterns.txt")
+    path = os.path.join(AUDIT_DIR, "blocked-patterns.txt")
     if not os.path.exists(path):
         return []
     with open(path) as f:
@@ -95,7 +95,7 @@ def log_entry(entry):
 
 
 def main():
-    if not is_nightmode_active():
+    if not is_audit_active():
         return
 
     hook_input = json.loads(sys.stdin.read())
@@ -109,7 +109,7 @@ def main():
     patterns = load_blocked_patterns()
     blocked, matched = check_blocked(command, patterns)
     if blocked:
-        reason = f"Blocked by nightmode policy (pattern: {matched})"
+        reason = f"Blocked by auto-audit policy (pattern: {matched})"
         log_entry({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": session_id,
