@@ -7,10 +7,12 @@ from datetime import datetime, timezone
 
 import psutil
 
-FLAG_FILE = "M:/.claude-liz/nightmode.active"
-LOCK_FILE = "M:/.claude-liz/watchdog.lock"
-LOG_DIR = "M:/.claude-liz/watchdog-logs"
-CONFIG_PATH = "M:/.claude-liz/nightmode/config.json"
+NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
+FLAG_FILE = os.path.join(BASE_DIR, "nightmode.active")
+LOCK_FILE = os.path.join(BASE_DIR, "watchdog.lock")
+LOG_DIR = os.path.join(BASE_DIR, "watchdog-logs")
+CONFIG_PATH = os.path.join(NIGHTMODE_DIR, "config.json")
 
 
 def load_config():

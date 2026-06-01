@@ -1,12 +1,22 @@
 #!/bin/bash
 set -e
 
-NIGHTMODE_DIR="M:/.claude-liz/nightmode"
-FLAG_FILE="M:/.claude-liz/nightmode.active"
-LOCK_FILE="M:/.claude-liz/watchdog.lock"
-PYTHON="M:/.claude-liz/nightmode/.venv/Scripts/python.exe"
-OLLAMA="M:/Ollama/ollama.exe"
-MODEL="qwen2.5-coder:3b"
+NIGHTMODE_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="$(dirname "$NIGHTMODE_DIR")"
+FLAG_FILE="$BASE_DIR/nightmode.active"
+LOCK_FILE="$BASE_DIR/watchdog.lock"
+
+# Auto-detect venv python (Windows vs Unix layout), fall back to system python3
+if [ -f "$NIGHTMODE_DIR/.venv/Scripts/python.exe" ]; then
+  PYTHON="$NIGHTMODE_DIR/.venv/Scripts/python.exe"
+elif [ -f "$NIGHTMODE_DIR/.venv/bin/python" ]; then
+  PYTHON="$NIGHTMODE_DIR/.venv/bin/python"
+else
+  PYTHON="python3"
+fi
+
+OLLAMA="${OLLAMA_BIN:-ollama}"
+MODEL="$($PYTHON -c "import json; print(json.load(open('$NIGHTMODE_DIR/config.json'))['model'])")"
 
 case "${1:-}" in
   on)

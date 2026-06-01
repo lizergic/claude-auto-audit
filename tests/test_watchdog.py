@@ -42,9 +42,9 @@ class TestFindClaudeProcesses:
     @patch("watchdog.psutil")
     def test_finds_claude_node_processes(self, mock_psutil):
         procs = [
-            make_mock_proc(100, "node.exe", ["node", "M:/npm-global/claude"], 500_000_000),
+            make_mock_proc(100, "node.exe", ["node", "/usr/local/bin/claude"], 500_000_000),
             make_mock_proc(200, "node.exe", ["node", "some-other-app"], 300_000_000),
-            make_mock_proc(300, "node.exe", ["node", "M:/npm-global/claude"], 800_000_000),
+            make_mock_proc(300, "node.exe", ["node", "/usr/local/bin/claude"], 800_000_000),
             make_mock_proc(400, "chrome.exe", ["chrome"], 1_000_000_000),
         ]
         mock_psutil.process_iter.return_value = procs
@@ -70,10 +70,10 @@ class TestGetProcessCwd:
     @patch("watchdog.psutil")
     def test_returns_cwd(self, mock_psutil):
         mock_proc = MagicMock()
-        mock_proc.cwd.return_value = "M:/Github/my-project"
+        mock_proc.cwd.return_value = "/home/user/project"
         mock_psutil.Process.return_value = mock_proc
 
-        assert watchdog.get_process_cwd(1234) == "M:/Github/my-project"
+        assert watchdog.get_process_cwd(1234) == "/home/user/project"
 
     @patch("watchdog.psutil")
     def test_returns_unknown_on_error(self, mock_psutil):

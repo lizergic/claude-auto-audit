@@ -9,7 +9,7 @@ import hook
 
 @pytest.fixture
 def patched_hook(nightmode_env, monkeypatch):
-    monkeypatch.setattr(hook, "CONFIG_DIR", nightmode_env["config_dir"])
+    monkeypatch.setattr(hook, "NIGHTMODE_DIR", nightmode_env["config_dir"])
     monkeypatch.setattr(hook, "FLAG_FILE", nightmode_env["flag_file"])
     monkeypatch.setattr(hook, "LOG_DIR", nightmode_env["log_dir"])
     return hook

@@ -6,28 +6,68 @@ Safe unattended Claude Code operation overnight. Three components:
 2. **RAM Watchdog** — Polls system RAM every 30s. When >85%, gracefully kills Claude instances (biggest first, commits work before killing, never kills the last one).
 3. **Morning Report** — Summary of overnight activity: dangerous commands, blocks, watchdog kills, branch status.
 
+> Anthropic has since shipped a first-party auto-permissions system in Claude Code itself, so this mostly lives on as a portfolio piece. Still works fine if you want a local, auditable version you own end-to-end.
+
+## Install
+
+Clone into your Claude config dir (so logs and flag files live alongside Claude's own state):
+
+```bash
+cd ~/.claude   # or wherever your CLAUDE_CONFIG_DIR points
+git clone https://github.com/<your-user>/nightmode.git
+cd nightmode
+
+python -m venv .venv
+.venv/bin/pip install psutil requests pytest      # Unix
+# .venv/Scripts/pip install psutil requests pytest  # Windows
+```
+
+Install [Ollama](https://ollama.com) and pull the classification model:
+
+```bash
+ollama pull qwen2.5-coder:3b
+```
+
+Register the hook in your Claude Code `settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python /absolute/path/to/nightmode/hook.py" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Optional — add a shell alias:
+
+```bash
+alias nightmode="bash ~/.claude/nightmode/nightmode.sh"
+```
+
 ## Quick Start
 
 ```bash
 # From a separate terminal (not inside Claude Code):
 nightmode on      # starts Ollama, warms model (~60s first time), activates hook + watchdog
-nightmode status   # check if active
+nightmode status  # check if active
 
 # Run your Claude Code instances in full access mode. Sleep.
 
-nightmode off      # deactivates everything, prints morning report
-```
-
-If the `nightmode` alias isn't available (new terminal needed after first setup), use:
-```bash
-bash M:/.claude-liz/nightmode/nightmode.sh on
+nightmode off     # deactivates everything, prints morning report
 ```
 
 ## How It Works
 
 ### Command Safety Gate (hook.py)
 
-Registered as a `PreToolUse` hook in `M:/.claude-liz/settings.json`. Fires on every `Bash` tool call.
+Fires on every `Bash` tool call via the `PreToolUse` hook.
 
 - **Night mode OFF:** Instant pass-through (no output, no overhead)
 - **Night mode ON:**
@@ -53,6 +93,7 @@ Shutdown sequence: finds Claude instances sorted by memory (biggest first), runs
 ### Morning Report (morning_report.py)
 
 Run automatically by `nightmode off`, or manually:
+
 ```bash
 nightmode report              # today + yesterday's logs
 nightmode report 2026-04-03   # specific date
@@ -60,7 +101,7 @@ nightmode report 2026-04-03   # specific date
 
 ## Configuration
 
-`M:/.claude-liz/nightmode/config.json`:
+`config.json`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -75,15 +116,22 @@ nightmode report 2026-04-03   # specific date
 
 ### Blocked Patterns
 
-`M:/.claude-liz/nightmode/blocked-patterns.txt` — one regex per line, `#` for comments:
+`blocked-patterns.txt` — one regex per line, `#` for comments:
+
 ```
 ^git\s+push(\s|$)
 ```
 
+### Ollama binary
+
+`nightmode.sh` looks for `ollama` on `PATH`. Override with `OLLAMA_BIN=/path/to/ollama`.
+
 ## File Layout
 
+Scripts resolve paths relative to their own location. Flag files and logs live one directory up from `nightmode/`:
+
 ```
-M:/.claude-liz/
+<parent-dir>/
   nightmode.active              # exists = night mode on
   watchdog.lock                 # watchdog PID (runtime)
   safety-logs/YYYY-MM-DD.jsonl  # command classification logs
@@ -96,18 +144,19 @@ M:/.claude-liz/
     config.json        # thresholds and model config
     blocked-patterns.txt
     .venv/             # Python venv (psutil, requests, pytest)
-    tests/             # 47 tests
+    tests/
 ```
 
 ## Running Tests
 
 ```bash
-cd M:/.claude-liz/nightmode
-.venv/Scripts/python -m pytest tests/ -v
+cd nightmode
+.venv/bin/python -m pytest tests/ -v       # Unix
+# .venv/Scripts/python -m pytest tests/ -v   # Windows
 ```
 
 ## Hardware Notes
 
-- Qwen 3B takes ~60s to cold-load into VRAM (GTX 1660 Ti, 6 GB). `nightmode on` handles this automatically.
+- Qwen 3B takes ~60s to cold-load into VRAM (tested on GTX 1660 Ti, 6 GB). `nightmode on` handles this automatically.
 - Once warm, classification takes ~1.5-3.5s per command.
 - The model uses ~2 GB VRAM. Ollama unloads it after inactivity, so daytime VRAM is free for other things.

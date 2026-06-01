@@ -1,3 +1,17 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+docs/
+
+# Claude Code local project settings (permission allow-lists etc.)
+.claude/
+
+# Personal launcher scripts
+myclaude_DSP.ps1
+
+# Runtime state (if someone clones into their live config dir)
+nightmode.active
+watchdog.lock
+../safety-logs/
+../watchdog-logs/

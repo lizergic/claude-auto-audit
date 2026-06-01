@@ -4,8 +4,10 @@ import sys
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-SAFETY_LOG_DIR = "M:/.claude-liz/safety-logs"
-WATCHDOG_LOG_DIR = "M:/.claude-liz/watchdog-logs"
+NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
+SAFETY_LOG_DIR = os.path.join(BASE_DIR, "safety-logs")
+WATCHDOG_LOG_DIR = os.path.join(BASE_DIR, "watchdog-logs")
 
 
 def read_log_file(path):

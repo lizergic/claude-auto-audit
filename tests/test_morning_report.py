@@ -19,7 +19,7 @@ def sample_safety_logs(nightmode_env):
         {
             "timestamp": "2026-04-02T05:14:32+00:00",
             "session_id": "s1",
-            "cwd": "M:/Github/my-project",
+            "cwd": "/tmp/project",
             "command": "rm -rf node_modules/",
             "classification": "DANGEROUS",
             "reason": "Recursively deletes directory contents",
@@ -29,7 +29,7 @@ def sample_safety_logs(nightmode_env):
         {
             "timestamp": "2026-04-02T08:55:00+00:00",
             "session_id": "s2",
-            "cwd": "M:/Github/my-project",
+            "cwd": "/tmp/project",
             "command": "git push origin feature/auth",
             "classification": "BLOCKED",
             "reason": "Blocked by nightmode policy",
@@ -50,7 +50,7 @@ def sample_watchdog_logs(nightmode_env):
             "timestamp": "2026-04-02T10:12:05+00:00",
             "event": "instance_killed",
             "pid": 18244,
-            "working_dir": "M:/Github/my-project",
+            "working_dir": "/tmp/project",
             "ram_percent": 87,
             "commit_success": True,
             "commit_sha": "a1b2c3d",

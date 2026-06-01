@@ -6,9 +6,10 @@ import time
 from datetime import datetime, timezone
 import requests
 
-CONFIG_DIR = "M:/.claude-liz/nightmode"
-FLAG_FILE = "M:/.claude-liz/nightmode.active"
-LOG_DIR = "M:/.claude-liz/safety-logs"
+NIGHTMODE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(NIGHTMODE_DIR)
+FLAG_FILE = os.path.join(BASE_DIR, "nightmode.active")
+LOG_DIR = os.path.join(BASE_DIR, "safety-logs")
 
 
 def is_nightmode_active():
@@ -16,12 +17,12 @@ def is_nightmode_active():
 
 
 def load_config():
-    with open(os.path.join(CONFIG_DIR, "config.json")) as f:
+    with open(os.path.join(NIGHTMODE_DIR, "config.json")) as f:
         return json.load(f)
 
 
 def load_blocked_patterns():
-    path = os.path.join(CONFIG_DIR, "blocked-patterns.txt")
+    path = os.path.join(NIGHTMODE_DIR, "blocked-patterns.txt")
     if not os.path.exists(path):
         return []
     with open(path) as f:
